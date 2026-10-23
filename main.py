@@ -1,6 +1,8 @@
 """main.py - Payslip System. Run:  python main.py
 Logins: hr / hr123 (HR)   manager / manager123 (MANAGER)"""
 import calendar
+import ctypes
+import os
 import tkinter as tk
 from datetime import date, datetime, timedelta
 from tkinter import ttk, messagebox
@@ -13,6 +15,9 @@ from output import PayslipPreview, PayslipView, build_model, export_pdf_dialog, 
 
 MONTHS = list(calendar.month_name)[1:]
 CUTOFFS = ["1st cutoff (1 - 15)", "2nd cutoff (16 - end)"]
+
+# App icon: put orbit.ico in the same folder as main.py
+ICON_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "orbit.ico")
 
 
 def num(var, label, strict=True):
@@ -523,6 +528,10 @@ class App(tk.Tk):
     def __init__(self, user):
         super().__init__()
         theme.apply_theme(self)
+        try:
+            self.iconbitmap(ICON_PATH)          # window + taskbar icon (orbit.ico)
+        except tk.TclError:
+            pass                                # icon missing: keep the default one
         self.user = user
         self.title(f"Payslip System - {user['username']} ({user['role']})")
         self.geometry(f"1280x{min(900, self.winfo_screenheight() - 80)}")
@@ -579,6 +588,11 @@ class App(tk.Tk):
 
 
 if __name__ == "__main__":
+    # Makes Windows show orbit.ico in the taskbar instead of the Python icon
+    try:
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("orbit.payslip.system")
+    except Exception:
+        pass
     db.init_db()
     user = ask_login()
     if user:
