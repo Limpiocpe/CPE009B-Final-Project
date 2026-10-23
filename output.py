@@ -9,13 +9,16 @@ from tkinter import ttk, messagebox, filedialog
 import payroll
 import theme
 
+# colors used on the payslip
 PAPER, HDR, GRAY, LIGHT = "white", "#6B8CB9", "#D9DCE1", "#EAEEF4"
 
 
+# formats a number like 1,234.50
 def peso(x):
     return f"{x:,.2f}"
 
 
+# turns 2026-10-15 into Oct 15, 2026
 def fdate(iso):
     return datetime.strptime(iso, "%Y-%m-%d").strftime("%b %d, %Y")
 
@@ -25,6 +28,7 @@ def _n(x, unit):
     return f"{x:g} {unit}" if x == 1 else f"{x:g} {unit}s"
 
 
+# turns 0.25 into 25
 def _pct(x):
     return f"{x * 100:g}"
 
@@ -33,6 +37,7 @@ def _pct(x):
 """Transforms raw computation outputs into a unified data contract. Because both on-screen rendering and PDF export consume this same dictionary,there is zero discrepancy between what is viewed and what is printed."""
 def build_model(emp, company, period, att, r, cfg, status="draft", approved_by=None):
     """emp/company/period/att/r as used by payroll.compute_payslip -> dict ready to draw."""
+    # work out the rates and dates first
     monthly = emp["monthly_basic_salary"]
     daily, hourly, minute = payroll.compute_rates(monthly, cfg)
     sd, ed = date.fromisoformat(period["start"]), date.fromisoformat(period["end"])
@@ -49,6 +54,7 @@ def build_model(emp, company, period, att, r, cfg, status="draft", approved_by=N
     hol_spe = r.get("holiday_special")
     if hol_spe is None:
         hol_spe = payroll.r2(daily * (cfg["SPECIAL_HOLIDAY_RATE"] - 1) * spe_d)
+    # rows for the earnings table: (label, hours/days, rate, amount)
     earnings = [
         ("Basic Pay (semi-monthly)", _n(expected, "day"), peso(daily), r["basic_pay"]),
         (f"Overtime (+{_pct(cfg['OT_RATE'] - 1)}%)", _n(ot_h, "hr"), peso(hourly * cfg["OT_RATE"]), r["ot_pay"]),
@@ -60,6 +66,7 @@ def build_model(emp, company, period, att, r, cfg, status="draft", approved_by=N
          peso(daily * (cfg["SPECIAL_HOLIDAY_RATE"] - 1)), hol_spe),
         ("13th Month / Bonus", "1 month - absent" if r["bonus"] else "", "", r["bonus"]),
     ]
+    # rows for the deductions table: (label, details, amount)
     deductions = [
         (f"Absent ({absent:g} days)", f"{absent:g} x {peso(daily)}", r["absent_ded"]),
         (f"Tardiness ({late:g} min)", f"{late:g} x {peso(minute)} per min", r["late_ded"]),
@@ -68,6 +75,7 @@ def build_model(emp, company, period, att, r, cfg, status="draft", approved_by=N
         ("Pag-IBIG", f"MID No. {emp['pagibig_no'] or '-'}", r["pagibig"]),
         ("Withholding Tax", f"TIN {emp['tin_no'] or '-'}", r["tax"]),
     ]
+    # everything the payslip needs, in one dict
     return dict(
         company=dict(name=company["name"], address=company["address"], tin=company["tin"],
                      contact=company.get("contact") or ""),
@@ -99,14 +107,17 @@ class PayslipView(ttk.Frame):
                               highlightbackground=theme.LINE)
         self.paper.pack(fill="x", padx=14, pady=10)
 
+    # removes everything drawn on the paper
     def _clear(self):
         for w in self.paper.winfo_children():
             w.destroy()
 
+    # shows a plain message instead of a payslip
     def show_message(self, text):
         self._clear()
         tk.Label(self.paper, text=text, bg=PAPER, fg=theme.MUTED, font=(theme.FONT, 11), pady=120).pack()
 
+    # redraws the payslip from the model
     def show(self, m):
         keep = self.sf.canvas.yview()[0]          # stay where the user scrolled to while typing
         self._clear()
@@ -114,9 +125,11 @@ class PayslipView(ttk.Frame):
         self.update_idletasks()
         self.sf.canvas.yview_moveto(keep)
 
+    # draws the payslip piece by piece
     def _draw(self, m):
         P, F = self.paper, theme.FONT
 
+        # small helper to make a label
         def lab(parent, text, size=9, bold=False, fg=theme.TEXT, bg=PAPER, anchor="w", italic=False, **kw):
             style = ("bold" if bold else "normal") + (" italic" if italic else "")
             return tk.Label(parent, text=text, bg=bg, fg=fg, anchor=anchor, justify="left",
@@ -160,6 +173,7 @@ class PayslipView(ttk.Frame):
         lab(P, m["attend_line"], 8).pack(anchor="w")
 
         # ---- tables
+        # helper that draws a table with a header, rows and a total line
         def table(headers, rows, weights, aligns, foot):
             t = tk.Frame(P, bg=PAPER)
             t.pack(fill="x", pady=(6, 0))
@@ -217,6 +231,7 @@ class PayslipView(ttk.Frame):
 # ===================================================================== PDF
 def export_pdf(m, path):
     """Draw the model on an A4 page (needs: pip install reportlab)."""
+    # reportlab is only needed when saving a PDF
     from reportlab.lib import colors
     from reportlab.lib.enums import TA_CENTER, TA_RIGHT
     from reportlab.lib.pagesizes import A4
@@ -227,14 +242,17 @@ def export_pdf(m, path):
     blue, hdr = colors.HexColor(theme.BLUE), colors.HexColor(HDR)
     gray, light = colors.HexColor(GRAY), colors.HexColor(LIGHT)
 
+    # helper for text styles
     def ps(size=8.5, bold=False, color=colors.black, **kw):
         kw.setdefault("leading", size * 1.3)
         return ParagraphStyle("s", fontName="Helvetica-Bold" if bold else "Helvetica", fontSize=size,
                               textColor=color, **kw)
 
+    # usable page width
     W = 180 * mm
     story = []
 
+    # company name and PAYSLIP title
     head = Table([[[Paragraph(m["company"]["name"], ps(18, True, blue, leading=22)),
                     Paragraph(m["company"]["address"], ps(8)),
                     Paragraph(f"TIN: {m['company']['tin']}" + (f" | {m['company']['contact']}" if m["company"]["contact"] else ""), ps(8))],
@@ -244,6 +262,7 @@ def export_pdf(m, path):
                               ("RIGHTPADDING", (0, 0), (-1, -1), 0)]))
     story += [head, Spacer(1, 7 * mm)]
 
+    # employee info box and the pay details grid
     e = m["emp"]
     box = Table([[Paragraph("EMPLOYEE INFORMATION", ps(7.5, True, colors.white))],
                  [Paragraph(e["name"], ps(10, True))],
@@ -268,6 +287,7 @@ def export_pdf(m, path):
     story += [outer, Spacer(1, 4 * mm), Paragraph(m["period_line"], ps(8, True)),
               Paragraph(m["attend_line"], ps(8)), Spacer(1, 2 * mm)]
 
+    # helper that builds a table with a header and a total row
     def grid(rows, widths, head_row, total_row, aligns):
         t = Table([head_row] + rows + [total_row], colWidths=widths)
         n = len(rows) + 1
@@ -291,6 +311,7 @@ def export_pdf(m, path):
                       ["", "TOTAL DEDUCTIONS", f"PHP {peso(m['total_ded'])}"], ("LEFT", "LEFT", "RIGHT")))
     story.append(Spacer(1, 6 * mm))
 
+    # net pay bar
     net = Table([[Paragraph("NET PAY", ps(11, True)), Paragraph(f"PHP {peso(m['net'])}", ps(14, True, alignment=TA_RIGHT, leading=18))]],
                 colWidths=[W / 2, W / 2])
     net.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), gray), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
@@ -298,6 +319,7 @@ def export_pdf(m, path):
                              ("LEFTPADDING", (0, 0), (-1, -1), 8), ("RIGHTPADDING", (0, 0), (-1, -1), 8)]))
     story += [net, Spacer(1, 22 * mm)]
 
+    # signature lines
     c = ps(8, False, alignment=TA_CENTER)
     ci = ParagraphStyle("i", parent=c, fontName="Helvetica-Oblique")
     """Generates formal document footer with signature baselines for HR, Manager, and Employee"""
@@ -315,10 +337,12 @@ def export_pdf(m, path):
     story += [Spacer(1, 8 * mm),
               Paragraph(f"If you have any questions about this payslip, please contact: {m['hr']}", ps(8, True, alignment=TA_CENTER))]
 
+    # builds the PDF file
     SimpleDocTemplate(path, pagesize=A4, leftMargin=15 * mm, rightMargin=15 * mm, topMargin=15 * mm,
                       bottomMargin=15 * mm, title=f"Payslip - {e['name']}").build(story)
 
 
+# asks where to save, then makes the PDF
 def export_pdf_dialog(model, default_name="payslip.pdf", parent=None):
     path = filedialog.asksaveasfilename(parent=parent, defaultextension=".pdf", initialfile=default_name,
                                         filetypes=[("PDF", "*.pdf")])

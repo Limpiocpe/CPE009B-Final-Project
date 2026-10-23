@@ -5,6 +5,7 @@ import database as db
 import theme
 
 
+# shows the login window, returns the user if correct, otherwise None
 def ask_login():
     result = {}
     root = tk.Tk()
@@ -15,6 +16,7 @@ def ask_login():
     root.geometry(f"{w}x{h}+{(root.winfo_screenwidth() - w) // 2}+{(root.winfo_screenheight() - h) // 3}")
     F = theme.FONT
 
+    # left panel with the title
     side = tk.Frame(root, bg=theme.SIDEBAR, width=300)
     side.pack(side="left", fill="y")
     side.pack_propagate(False)
@@ -23,6 +25,7 @@ def ask_login():
     tk.Label(side, text="Semi-monthly payroll with SSS, PhilHealth,\nPag-IBIG and withholding tax built in.",
              bg=theme.SIDEBAR, fg=theme.SIDEBAR_TXT, font=(F, 10), justify="left").pack(anchor="w", padx=32, pady=(14, 0))
 
+    # right side: username and password
     form = ttk.Frame(root, padding=(48, 0))
     form.pack(side="left", fill="both", expand=True)
     form.columnconfigure(0, weight=1)
@@ -38,6 +41,7 @@ def ask_login():
     err = ttk.Label(form, text="", style="Error.TLabel")
     err.grid(row=6, column=0, sticky="w")
 
+    # runs when Sign in is clicked or Enter is pressed
     def attempt(_=None):
         user = db.authenticate(u.get(), p.get())
         if user:
@@ -49,5 +53,6 @@ def ask_login():
     ttk.Button(form, text="Sign in", style="Primary.TButton", command=attempt).grid(row=7, column=0, sticky="ew", pady=(10, 0))
     root.bind("<Return>", attempt)
     ue.focus()
+    # wait here until the window closes
     root.mainloop()
     return result or None

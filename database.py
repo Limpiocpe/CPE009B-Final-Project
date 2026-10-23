@@ -3,6 +3,7 @@ import hashlib, hmac, os, sqlite3
 from datetime import datetime
 import config
 
+# table definitions, only created if they don't exist yet
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, password_hash TEXT, salt TEXT, role TEXT);
 CREATE TABLE IF NOT EXISTS company (id INTEGER PRIMARY KEY, name TEXT, address TEXT, tin TEXT, contact TEXT,
@@ -29,12 +30,14 @@ CREATE TABLE IF NOT EXISTS payslips (
 """
 
 
+# opens the database file
 def connect():
     conn = sqlite3.connect(config.DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
 
+# for insert / update / delete, saves right away
 def run(sql, args=()):
     """Run one write statement and commit. Returns lastrowid."""
     conn = connect()
@@ -45,6 +48,7 @@ def run(sql, args=()):
         conn.close()
 
 
+# for select, returns a list of dicts
 def query(sql, args=()):
     conn = connect()
     try:
@@ -53,12 +57,14 @@ def query(sql, args=()):
         conn.close()
 
 
+# hashes the password with a salt so it isn't stored as plain text
 def hash_password(password, salt=None):
     salt = salt or os.urandom(16).hex()
     h = hashlib.pbkdf2_hmac("sha256", password.encode(), bytes.fromhex(salt), 100_000)
     return h.hex(), salt
 
 
+# adds columns that are missing in an older database
 def _add_columns(conn, table, columns):
     have = {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}
     for name, ddl in columns.items():
@@ -66,6 +72,7 @@ def _add_columns(conn, table, columns):
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
 
 
+# updates an older database to the new layout
 def _migrate(conn):
     """Bring a database created by an older version up to date (safe to run every start)."""
     _add_columns(conn, "company", {c: "TEXT" for c in ("hr_name", "hr_title", "manager_name", "manager_title")})
@@ -75,6 +82,7 @@ def _migrate(conn):
         conn.execute(f"UPDATE company SET {col}=? WHERE {col} IS NULL OR {col}=''", (config.COMPANY[col],))
 
 
+# creates the tables and adds the default data on the first run
 def init_db():
     """Create tables and seed defaults on first run."""
     conn = connect()
@@ -101,6 +109,7 @@ def init_db():
 
 
 # ---------------------------------------------------------------- login
+# checks the username and password, returns the user or None
 def authenticate(username, password):
     """Return {'username', 'role'} if valid, else None."""
     rows = query("SELECT * FROM users WHERE username=?", (username.strip().lower(),))
@@ -111,11 +120,13 @@ def authenticate(username, password):
     return None
 
 
+# true if the role is allowed to do the action
 def can(role, action):
     return action in config.PERMISSIONS.get(role, ())
 
 
 # --------------------------------------------------------------- config
+# loads rates, tax/SSS tables and company info into one dict
 def load_config():
     """One dict with every setting plus SSS_TABLE, TAX_TABLE, COMPANY_INFO."""
     cfg = {r["key"]: r["value"] for r in query("SELECT * FROM settings")}
@@ -128,15 +139,18 @@ def load_config():
     return cfg
 
 
+# saves one changed rate
 def update_setting(key, value):
     if key not in config.SETTINGS or float(value) < 0:
         raise ValueError("Invalid setting.")
     run("UPDATE settings SET value=? WHERE key=?", (float(value), key))
 
 
+# company columns that can be edited
 COMPANY_FIELDS = ["name", "address", "tin", "contact", "hr_name", "hr_title", "manager_name", "manager_title"]
 
 
+# saves company, HR and manager info (names can't be blank)
 def update_company(info):
     for f in ("name", "hr_name", "manager_name"):
         if not str(info.get(f, "")).strip():
@@ -145,20 +159,24 @@ def update_company(info):
         [str(info.get(f, "")).strip() for f in COMPANY_FIELDS])
 
 
+# finds the SSS share for the salary bracket
 def lookup_sss(salary, sss_table):
     return next((s for lo, hi, s in sss_table if lo <= salary < hi), sss_table[-1][2])
 
 
+# yearly tax = bracket base tax + rate on the amount over the bracket
 def lookup_tax(annual_taxable, tax_table):
     return next((base + (annual_taxable - lo) * rate
                  for lo, hi, base, rate in tax_table if lo <= annual_taxable < hi), 0.0)
 
 
 # ------------------------------------------------------------ employees
+# employee columns in the order they are saved
 EMP_FIELDS = ["employee_id", "full_name", "position", "department", "monthly_basic_salary",
               "sss_no", "philhealth_no", "pagibig_no", "tin_no", "status"]
 
 
+# required fields and salary are checked before saving
 def save_employee(emp):
     """Add a new employee, or update if the ID already exists."""
     for f in ("employee_id", "full_name", "position", "department"):
@@ -170,17 +188,20 @@ def save_employee(emp):
     run(f"INSERT OR REPLACE INTO employees ({','.join(EMP_FIELDS)}) VALUES ({','.join('?' * 10)})", values)
 
 
+# gets one employee by ID
 def get_employee(employee_id):
     rows = query("SELECT * FROM employees WHERE employee_id=?", (employee_id,))
     return rows[0] if rows else None
 
 
+# gets all employees, filtered by name or ID when searching
 def list_employees(search=""):
     like = f"%{search}%"
     return query("SELECT * FROM employees WHERE full_name LIKE ? OR employee_id LIKE ? ORDER BY full_name", (like, like))
 
 
 # ----------------------------------------------------------- attendance
+# saves attendance for one cut-off, checks for negatives and valid dates
 def save_attendance(employee_id, start, end, days_worked=0, absent_days=0, late_minutes=0,
                     ot_hours=0, night_diff_hours=0, expected_days=0,
                     regular_holiday_days=0, special_holiday_days=0):
@@ -199,6 +220,7 @@ def save_attendance(employee_id, start, end, days_worked=0, absent_days=0, late_
         " VALUES (?,?,?,?,?,?,?,?,?,?,?)", (employee_id, start, end, *map(float, nums)))
 
 
+# gets the saved attendance of an employee for a cut-off
 def get_attendance(employee_id, start, end):
     rows = query("SELECT * FROM attendance WHERE employee_id=? AND period_start=? AND period_end=?",
                  (employee_id, start, end))
@@ -206,32 +228,38 @@ def get_attendance(employee_id, start, end):
 
 
 # ------------------------------------------------------------- payslips
+# saves a generated payslip (status starts as pending)
 def save_payslip(data):
     """data = dict whose keys match the payslips columns. Returns payslip_id."""
     data = {**data, "created_at": datetime.now().isoformat(timespec="seconds")}
     return run(f"INSERT INTO payslips ({','.join(data)}) VALUES ({','.join('?' * len(data))})", list(data.values()))
 
 
+# gets saved payslips, newest first
 def list_payslips(employee_id=None):
     if employee_id:
         return query("SELECT * FROM payslips WHERE employee_id=? ORDER BY created_at DESC", (employee_id,))
     return query("SELECT * FROM payslips ORDER BY created_at DESC")
 
 
+# checks if a payslip already exists for that employee and cut-off
 def find_payslip(employee_id, start, end):
     rows = query("SELECT * FROM payslips WHERE employee_id=? AND period_start=? AND period_end=?",
                  (employee_id, start, end))
     return rows[0] if rows else None
 
 
+# removes a payslip
 def delete_payslip(payslip_id):
     run("DELETE FROM payslips WHERE payslip_id=?", (payslip_id,))
 
 
+# marks the payslip as approved by the manager
 def approve_payslip(payslip_id, manager):
     run("UPDATE payslips SET status='approved', approved_by=? WHERE payslip_id=?", (manager, payslip_id))
 
 
+# run this file alone to just create the database
 if __name__ == "__main__":
     init_db()
     print("Database ready:", config.DB_PATH)

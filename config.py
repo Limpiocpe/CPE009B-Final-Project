@@ -2,10 +2,13 @@
 after that, edit rates and company/HR/manager names in the app's Settings tab (stored in the DB)."""
 import os
 
+# where the database file is saved (same folder as this file)
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "payslip.db")
 
+# default logins: (username, password, role)
 USERS = [("hr", "hr123", "HR"), ("manager", "manager123", "MANAGER")]   # dummy logins
 
+# what each role is allowed to do
 PERMISSIONS = {
     "HR": ("manage_employees", "encode_attendance", "generate_payslip", "view_payslips", "edit_settings"),
     "MANAGER": ("view_payslips", "approve_payslip"),
@@ -21,6 +24,7 @@ COMPANY = dict(
     manager_name="Roberto Reyes", manager_title="General Manager",
 )
 
+# default rates, these can be changed later in the Settings tab
 SETTINGS = {
     "WORKING_DAYS_PER_MONTH": 22,    # daily rate = monthly salary / this
     "HOURS_PER_DAY": 8,
@@ -46,6 +50,7 @@ TAX_TABLE = [(0, 250000, 0, 0.0), (250000, 400000, 0, 0.15), (400000, 800000, 22
              (800000, 2000000, 102500, 0.25), (2000000, 8000000, 402500, 0.30),
              (8000000, None, 2202500, 0.35)]
 
+# sample employees, added to the database on the first run
 DUMMY_EMPLOYEES = [
     dict(employee_id="EMP-001", full_name="Katindig, Jiro Luis A.", position="Software Developer",
          department="IT Department", monthly_basic_salary=30000, sss_no="34-1234567-8",

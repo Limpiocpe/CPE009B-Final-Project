@@ -13,8 +13,10 @@ FONT = "Segoe UI"          # replaced by the first installed font in apply_theme
 _SCROLLERS = []            # canvases that react to the mouse wheel
 
 
+# sets the fonts and colors for all the widgets
 def apply_theme(root):
     global FONT
+    # pick the first font that is installed
     families = set(tkfont.families(root))
     FONT = next((f for f in ("Segoe UI Variable Text", "Segoe UI", "SF Pro Text", "Helvetica Neue", "Inter",
                              "Arial", "DejaVu Sans") if f in families), "TkDefaultFont")
@@ -24,6 +26,7 @@ def apply_theme(root):
     root.option_add("*TCombobox*Listbox.selectBackground", BLUE)
     root.option_add("*TCombobox*Listbox.selectForeground", "white")
     root.option_add("*TCombobox*Listbox.font", (FONT, 10))
+    # styles for labels, inputs, buttons, tables and scrollbars
     st = ttk.Style(root)
     st.theme_use("clam")
     st.configure(".", font=(FONT, 10), background=BG, foreground=TEXT, bordercolor=LINE,
@@ -82,11 +85,13 @@ def apply_theme(root):
     st.map("Treeview", background=[("selected", BLUE_LT)], foreground=[("selected", BLUE_DK)])
     st.layout("Treeview", [("Treeview.treearea", {"sticky": "nswe"})])
 
+    # mouse wheel scrolling
     root.bind_all("<MouseWheel>", _on_wheel, add="+")
     root.bind_all("<Button-4>", _on_wheel, add="+")
     root.bind_all("<Button-5>", _on_wheel, add="+")
 
 
+# scrolls the scroll area the mouse is over
 def _on_wheel(e):
     w = e.widget.winfo_containing(e.x_root, e.y_root) if hasattr(e.widget, "winfo_containing") else None
     while w is not None:
@@ -126,11 +131,13 @@ class NavItem(tk.Frame):
             w.bind("<Enter>", lambda _e: self._paint(True))
             w.bind("<Leave>", lambda _e: self._paint(False))
 
+    # highlights the tab when hovered or selected
     def _paint(self, hover=False):
         on = self.active or hover
         self.lbl.configure(fg="white" if on else SIDEBAR_TXT, font=(FONT, 10, "bold" if self.active else "normal"))
         self.bar.configure(bg=BLUE if self.active else SIDEBAR)
 
+    # turns the highlight on or off
     def set_active(self, on):
         self.active = on
         self._paint()
@@ -165,6 +172,7 @@ class ScrollFrame(ttk.Frame):
         self.canvas.configure(yscrollcommand=self.vsb.set)
         self.canvas.pack(side="left", fill="both", expand=True)
         self.vsb.pack(side="right", fill="y")
+        # keep the scroll area sized to its content
         self.inner.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
         self.canvas.bind("<Configure>", lambda e: self.canvas.itemconfigure(win, width=e.width))
         _SCROLLERS.append(self.canvas)

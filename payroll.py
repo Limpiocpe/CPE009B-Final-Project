@@ -33,12 +33,14 @@ def compute_payslip(emp, att, cfg, include_13th=False):
     att = dict(absent_days, late_minutes, ot_hours, night_diff_hours,
                regular_holiday_days, special_holiday_days).
     Returns one result dict (every money value already rounded to 2 decimals)."""
+    # get the salary and the rates
     monthly = emp["monthly_basic_salary"]
     cutoffs = int(cfg["CUTOFFS_PER_MONTH"])
     daily, hourly, minute = compute_rates(monthly, cfg)
 
     # ---- earnings
     basic_pay = r2(monthly / cutoffs)                                   # fixed half-month (kinsenas)
+    # overtime and night diff are based on the hourly rate
     ot_pay = r2(hourly * cfg["OT_RATE"] * att["ot_hours"])
     night_diff_pay = r2(hourly * cfg["NIGHT_DIFF_RATE"] * att["night_diff_hours"])
     # holiday pay = the EXTRA over a normal day (the day's regular pay is already inside basic pay)
@@ -47,6 +49,7 @@ def compute_payslip(emp, att, cfg, include_13th=False):
     holiday_pay = r2(holiday_regular + holiday_special)
     # 13th month / bonus: one full month minus the days absent
     bonus = r2(max(0.0, monthly - daily * att["absent_days"])) if include_13th else 0.0
+    # gross pay = all the earnings added together
     gross = r2(basic_pay + ot_pay + night_diff_pay + holiday_pay + bonus)
 
     # ---- attendance deductions
@@ -75,6 +78,7 @@ def compute_payslip(emp, att, cfg, include_13th=False):
     """Taxable Income: Gross pay minus tax-exempt bonuses, attendance deductions, and mandatory gov contributions. max(0.0, ...) protects against negative taxable base if deductions exceed cut-off pay."""
     taxable = max(0.0, gross - exempt - absent_ded - late_ded - gov)
     """Annualizes taxable income to evaluate against progressive annual tax brackets,then de-annualizes back down to the current pay period cut-off."""
+    # 12 months x cut-offs per month
     periods_per_year = cutoffs * 12
     tax = r2(lookup_tax(taxable * periods_per_year, cfg["TAX_TABLE"]) / periods_per_year)
 

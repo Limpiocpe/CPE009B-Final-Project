@@ -13,7 +13,9 @@ import theme
 from login import ask_login
 from output import PayslipPreview, PayslipView, build_model, export_pdf_dialog, fdate
 
+# month names for the dropdown
 MONTHS = list(calendar.month_name)[1:]
+# the two cut-off choices
 CUTOFFS = ["1st cutoff (1 - 15)", "2nd cutoff (16 - end)"]
 
 # App icon: put orbit.ico in the same folder as main.py
@@ -36,6 +38,7 @@ def num(var, label, strict=True):
     return n
 
 
+# accepts a few date formats
 def parse_date(text):
     for fmt in ("%b %d, %Y", "%Y-%m-%d", "%m/%d/%Y", "%B %d, %Y"):
         try:
@@ -49,6 +52,7 @@ class NoPayslip(ValueError):
     """Raised when there is nothing to show yet (no employee / no salary)."""
 
 
+# makes a white box with a title
 def card(parent, title):
     c = theme.Card(parent, title)
     c.pack(fill="x", pady=(0, 12), padx=(0, 8))
@@ -75,6 +79,7 @@ def field(parent, row, col, label, kind, var, span=1, **kw):
 
 # =============================================================== PAYSLIP TAB
 class PayslipTab(ttk.Frame):
+    # fields shown in the employee box (display only)
     INFO = [("full_name", "Full name"), ("employee_id", "Employee ID"), ("department", "Department"),
             ("position", "Position"), ("salary", "Monthly salary (PHP)"), ("status", "Status"),
             ("sss_no", "SSS No."), ("philhealth_no", "PhilHealth No."),
@@ -82,8 +87,10 @@ class PayslipTab(ttk.Frame):
 
     def __init__(self, parent, app):
         super().__init__(parent)
+        # employees list, rates and the delayed refresh job
         self.app, self.emps, self.cfg, self._job = app, {}, None, None
         self._loading, self._prev_expected = False, ""
+        # variables tied to the form inputs
         today = date.today()
         self.emp = tk.StringVar()
         self.info = {k: tk.StringVar() for k, _ in self.INFO}
@@ -97,6 +104,7 @@ class PayslipTab(ttk.Frame):
                   ("late_minutes", "ot_hours", "night_diff_hours", "regular_holiday_days", "special_holiday_days")}
         self.bonus = tk.BooleanVar()
 
+        # layout: form on the left, payslip on the right
         self.columnconfigure(1, weight=1)
         self.rowconfigure(0, weight=1)
 
@@ -108,12 +116,14 @@ class PayslipTab(ttk.Frame):
         sf.pack(fill="both", expand=True)
         body = sf.inner
 
+        # employee box
         emp = card(body, "Employee Information")
         self.emp_cb = field(emp, 0, 0, "Quick pick", "combo", self.emp, span=2)
         self.emp_cb.bind("<<ComboboxSelected>>", self._picked)
         for i, (k, t) in enumerate(self.INFO):
             field(emp, 1 + i // 2, i % 2, t, "ro", self.info[k])
 
+        # pay period box
         per = card(body, "Cut-off / Pay Period")
         field(per, 0, 0, "Month", "combo", self.month, values=MONTHS)
         field(per, 0, 1, "Year", "spin", self.year, to=2100)
@@ -124,6 +134,7 @@ class PayslipTab(ttk.Frame):
         ttk.Label(per, textvariable=self.duration, style="Info.TLabel").grid(
             row=2, column=0, columnspan=2, sticky="ew", padx=4, pady=(6, 0))
 
+        # attendance and adjustments box
         att = card(body, "Attendance & Pay Adjustments")
         field(att, 0, 0, "Expected work days", "spin", self.expected, to=31)
         field(att, 0, 1, "Days worked (8 hrs)", "spin", self.worked, to=31)
@@ -138,6 +149,7 @@ class PayslipTab(ttk.Frame):
         ttk.Button(att, text="Reset attendance", style="Link.TButton", command=self.reset).grid(
             row=5, column=1, sticky="e", pady=(4, 0))
 
+        # update the payslip when any value changes
         for v in (self.expected, self.worked, self.pay, *self.v.values()):
             v.trace_add("write", lambda *_: self._schedule())
         self.bonus.trace_add("write", lambda *_: self._schedule())
@@ -160,6 +172,7 @@ class PayslipTab(ttk.Frame):
         self.view.grid(row=0, column=1, sticky="nsew")
         self._period_changed()
 
+    # stop the pending refresh before closing
     def destroy(self):
         if self._job:
             self.after_cancel(self._job)
@@ -178,11 +191,13 @@ class PayslipTab(ttk.Frame):
         self._fill_info()
         self.preview()
 
+    # runs when an employee is chosen
     def _picked(self, _=None):
         self.saved.config(text="")
         self._fill_info()
         self.preview()
 
+    # shows the chosen employee's details
     def _fill_info(self):
         e = self.emps.get(self.emp.get())
         for k, _ in self.INFO:
@@ -193,6 +208,7 @@ class PayslipTab(ttk.Frame):
             self.info[k].set(val)
 
     # ---- period
+    # returns start date, end date and name of the selected cut-off
     def period(self):
         try:
             y, m = int(self.year.get()), MONTHS.index(self.month.get()) + 1
@@ -205,6 +221,7 @@ class PayslipTab(ttk.Frame):
             return date(y, m, 1), date(y, m, 15), "1st Kinsena"
         return date(y, m, 16), date(y, m, last), "2nd Kinsena"
 
+    # updates duration, pay date and default work days when the period changes
     def _period_changed(self):
         try:
             s, e, _ = self.period()
@@ -224,6 +241,7 @@ class PayslipTab(ttk.Frame):
         self.saved.config(text="")
         self._schedule()
 
+    # keeps days worked equal to expected days unless the user changed it
     def _expected_changed(self, *_):
         new = self.expected.get()
         if not self._loading and self.worked.get() == self._prev_expected:
@@ -231,12 +249,14 @@ class PayslipTab(ttk.Frame):
         self._prev_expected = new
 
     # ---- live preview
+    # waits a moment before redrawing so typing doesn't lag
     def _schedule(self):
         self.saved.config(text="")
         if self._job:
             self.after_cancel(self._job)
         self._job = self.after(60, self.preview)
 
+    # absent days = expected days - days worked
     def _update_absent(self):
         try:
             a = max(0.0, num(self.expected, "", False) - num(self.worked, "", False))
@@ -244,6 +264,7 @@ class PayslipTab(ttk.Frame):
         except ValueError:
             self.absent.set("?")
 
+    # redraws the payslip on screen
     def preview(self):
         self._job = None
         if self.cfg is None:
@@ -262,6 +283,7 @@ class PayslipTab(ttk.Frame):
         self.view.show(model)
 
     # ---- gather + compute
+    # reads and checks all inputs, then computes the payslip
     def _collect(self, strict):
         emp = self.emps.get(self.emp.get())
         if not emp:
@@ -285,6 +307,7 @@ class PayslipTab(ttk.Frame):
         return emp, period, att, r, build_model(emp, self.cfg["COMPANY_INFO"], period, att, r, self.cfg)
 
     # ---- buttons
+    # saves the payslip (HR only), asks first if one already exists
     def generate(self):
         if not db.can(self.app.user["role"], "generate_payslip"):
             return messagebox.showerror("Access", "Your role cannot generate payslips.")
@@ -312,6 +335,7 @@ class PayslipTab(ttk.Frame):
             return messagebox.showerror("Cannot generate", str(ex))
         self.saved.config(text=f"Payslip #{pid} generated and saved - waiting for manager approval.")
 
+    # exports the current payslip as a PDF
     def save_pdf(self):
         try:
             emp, period, _, _, model = self._collect(True)
@@ -319,6 +343,7 @@ class PayslipTab(ttk.Frame):
             return messagebox.showerror("Cannot save PDF", str(ex))
         export_pdf_dialog(model, f"payslip_{emp['employee_id']}_{period['start']}.pdf", self)
 
+    # sets all the adjustments back to 0
     def reset(self):
         self._loading = True
         for var in self.v.values():
@@ -330,6 +355,7 @@ class PayslipTab(ttk.Frame):
 
 
 # ============================================================== EMPLOYEES TAB
+# employees tab: add and edit employee records
 class EmployeeTab(ttk.Frame):
     LABELS = [("employee_id", "Employee ID"), ("full_name", "Full Name"), ("position", "Position"),
               ("department", "Department"), ("monthly_basic_salary", "Monthly Basic Salary"),
@@ -366,12 +392,14 @@ class EmployeeTab(ttk.Frame):
         box.pack(fill="both", expand=True)
         self.tree.bind("<<TreeviewSelect>>", self.load)
 
+    # reloads the employee list (also used for search)
     def refresh(self):
         self.tree.delete(*self.tree.get_children())
         for i, e in enumerate(db.list_employees(self.search.get())):
             self.tree.insert("", "end", iid=e["employee_id"], tags=("odd",) if i % 2 else (), values=(
                 e["employee_id"], e["full_name"], e["department"], f"{e['monthly_basic_salary']:,.2f}"))
 
+    # fills the form with the selected employee
     def load(self, _=None):
         sel = self.tree.selection()
         if sel:
@@ -379,10 +407,12 @@ class EmployeeTab(ttk.Frame):
             for k in self.f:
                 self.f[k].set(e[k] if e[k] is not None else "")
 
+    # clears the form
     def new(self):
         for k, v in self.f.items():
             v.set("regular" if k == "status" else "")
 
+    # checks the fields then saves the employee
     def save(self):
         emp = {k: v.get().strip() for k, v in self.f.items()}
         try:
@@ -401,10 +431,12 @@ class EmployeeTab(ttk.Frame):
 
 
 # ============================================================== PAYSLIPS TAB
+# saved payslips tab: view, approve and export
 class PayslipListTab(ttk.Frame):
     def __init__(self, parent, app):
         super().__init__(parent)
         self.app = app
+        # columns of the table
         cols = ("id", "employee", "period", "pay_date", "gross", "net", "status")
         heads = ("ID", "Employee", "Period", "Pay date", "Gross pay", "Net pay", "Status")
         bar = ttk.Frame(self)
@@ -418,6 +450,7 @@ class PayslipListTab(ttk.Frame):
         box.pack(fill="both", expand=True)
         self.tree.bind("<Double-1>", lambda _: self.view())
 
+    # reloads the list of saved payslips
     def refresh(self):
         self.tree.delete(*self.tree.get_children())
         for i, p in enumerate(db.list_payslips()):
@@ -427,6 +460,7 @@ class PayslipListTab(ttk.Frame):
                 f"{fdate(p['period_start'])} - {fdate(p['period_end'])}", fdate(p["pay_date"]),
                 f"{p['gross_pay']:,.2f}", f"{p['net_pay']:,.2f}", str(p["status"]).capitalize()))
 
+    # returns the selected payslip, or asks the user to pick one
     def _selected(self):
         sel = self.tree.selection()
         if not sel:
@@ -434,6 +468,7 @@ class PayslipListTab(ttk.Frame):
             return None
         return next(p for p in db.list_payslips() if str(p["payslip_id"]) == sel[0])
 
+    # opens the selected payslip in a preview window
     def view(self):
         p = self._selected()
         if not p:
@@ -447,6 +482,7 @@ class PayslipListTab(ttk.Frame):
                             status=p["status"], approved_by=p["approved_by"])
         PayslipPreview(self, model, f"payslip_{p['employee_id']}_{p['period_start']}.pdf")
 
+    # manager approves the payslip
     def approve(self):
         p = self._selected()
         if p and p["status"] != "approved":
@@ -455,11 +491,14 @@ class PayslipListTab(ttk.Frame):
 
 
 # =============================================================== SETTINGS TAB
+# settings tab: company info and rates
 class SettingsTab(ttk.Frame):
+    # (column, label) for the company info fields
     COMPANY_LABELS = [("name", "Company name"), ("address", "Address"), ("tin", "Company TIN"),
                       ("contact", "Contact no."), ("hr_name", "HR officer (prepared by)"),
                       ("hr_title", "HR title"), ("manager_name", "Manager (approved by)"),
                       ("manager_title", "Manager title")]
+    # readable names for each rate
     RATE_LABELS = {
         "WORKING_DAYS_PER_MONTH": "Working days per month (daily rate = salary / this)",
         "HOURS_PER_DAY": "Hours per day", "OT_RATE": "Overtime rate (1.25 = +25%)",
@@ -489,6 +528,7 @@ class SettingsTab(ttk.Frame):
         self.box.pack(anchor="w")
         ttk.Button(right, text="Save rates", style="Primary.TButton", command=self.save).pack(anchor="w", pady=(10, 0))
 
+    # loads the company info and rates into the boxes
     def refresh(self):
         info = db.load_config()["COMPANY_INFO"]
         for k, _ in self.COMPANY_LABELS:
@@ -502,6 +542,7 @@ class SettingsTab(ttk.Frame):
                 row=i, column=0, sticky="w", padx=(0, 14), pady=3)
             ttk.Entry(self.box, textvariable=self.vars[r["key"]], width=12).grid(row=i, column=1, pady=3)
 
+    # saves the edited rates
     def save(self):
         try:
             for k, v in self.vars.items():
@@ -510,6 +551,7 @@ class SettingsTab(ttk.Frame):
             return messagebox.showerror("Settings", "All values must be non-negative numbers.")
         messagebox.showinfo("Settings", "Saved.")
 
+    # saves the company info
     def save_company(self):
         try:
             db.update_company({k: v.get() for k, v in self.cvars.items()})
@@ -519,7 +561,9 @@ class SettingsTab(ttk.Frame):
 
 
 # ==================================================================== APP
+# main window after login
 class App(tk.Tk):
+    # title and subtitle of each tab
     PAGES = {"Payslip": ("Payslip", "Pick an employee and a cut-off. The payslip updates as you type."),
              "Employees": ("Employees", "Add people and keep their contribution numbers up to date."),
              "Saved Payslips": ("Saved payslips", "Review generated payslips, approve them and export PDFs."),
@@ -538,6 +582,7 @@ class App(tk.Tk):
         self.minsize(1100, 680)
         F = theme.FONT
 
+        # top bar with the tab buttons
         top = tk.Frame(self, bg=theme.SIDEBAR)
         top.pack(side="top", fill="x")
         tk.Label(top, text="Payslip System", bg=theme.SIDEBAR, fg="white", font=(F, 13, "bold")).pack(
@@ -545,6 +590,7 @@ class App(tk.Tk):
         side = top
         main = ttk.Frame(self)
         main.pack(side="top", fill="both", expand=True)
+        # page title area
         head = ttk.Frame(main, padding=(28, 20, 28, 8))
         head.pack(fill="x")
         self.h_title = ttk.Label(head, style="Title.TLabel")
@@ -554,6 +600,7 @@ class App(tk.Tk):
         self.stage = ttk.Frame(main, padding=(28, 6, 28, 20))
         self.stage.pack(fill="both", expand=True)
 
+        # only create the tabs that the user's role is allowed to use
         self.tabs, self.nav, self.current = {}, {}, None
         role = user["role"]
         for perm, cls, name in (("generate_payslip", PayslipTab, "Payslip"),
@@ -566,12 +613,14 @@ class App(tk.Tk):
                 item.pack(side="left")
                 self.nav[name] = item
 
+        # shows who is logged in
         who = tk.Label(top, text=f"{user['username']}  \u00b7  {'HR' if role == 'HR' else role.title()}",
                        bg=theme.SIDEBAR, fg=theme.SIDEBAR_TXT, font=(F, 9))
         who.pack(side="right", padx=24)
         if self.tabs:
             self.show(next(iter(self.tabs)))
 
+    # switches to another tab
     def show(self, name):
         if self.current:
             self.tabs[self.current].pack_forget()
@@ -593,6 +642,7 @@ if __name__ == "__main__":
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("orbit.payslip.system")
     except Exception:
         pass
+    # start: set up the database, log in, then open the app
     db.init_db()
     user = ask_login()
     if user:
