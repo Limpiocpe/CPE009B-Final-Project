@@ -30,6 +30,7 @@ def _pct(x):
 
 
 # ====================================================================== MODEL
+"""Transforms raw computation outputs into a unified data contract. Because both on-screen rendering and PDF export consume this same dictionary,there is zero discrepancy between what is viewed and what is printed."""
 def build_model(emp, company, period, att, r, cfg, status="draft", approved_by=None):
     """emp/company/period/att/r as used by payroll.compute_payslip -> dict ready to draw."""
     monthly = emp["monthly_basic_salary"]
@@ -86,6 +87,7 @@ def build_model(emp, company, period, att, r, cfg, status="draft", approved_by=N
 
 
 # ================================================================ SCREEN VIEW
+"""Live Preview GUI Canvas (PayslipView)"""
 class PayslipView(ttk.Frame):
     """Scrollable white 'paper' that redraws from a model dict. Cheap enough to redraw on every keystroke."""
 
@@ -187,6 +189,7 @@ class PayslipView(ttk.Frame):
               ("", "TOTAL DEDUCTIONS", f"PHP {peso(m['total_ded'])}"))
 
         # ---- net pay
+        """Renders the highlighted Net Pay summary bar at the bottom of the slip"""
         net = tk.Frame(P, bg=GRAY)
         net.pack(fill="x", pady=(12, 0))
         lab(net, "NET PAY", 10, True, bg=GRAY).pack(side="left", padx=12, pady=7)
@@ -282,6 +285,7 @@ def export_pdf(m, path):
                       ["EARNINGS", "HOURS / DAYS", "RATE", "AMOUNT"],
                       ["", "", "GROSS PAY", f"PHP {peso(m['gross'])}"], ("LEFT", "CENTER", "RIGHT", "RIGHT")))
     story += [Spacer(1, 1.5 * mm), Paragraph(m["note"], ps(7, False, colors.HexColor(theme.MUTED))), Spacer(1, 5 * mm)]
+    """Converts deduction tuples from build_model() directly into a ReportLab Table"""
     story.append(grid([[a, b, peso(c)] for a, b, c in m["deductions"]], [78 * mm, 68 * mm, 34 * mm],
                       ["DEDUCTIONS", "DETAILS", "AMOUNT"],
                       ["", "TOTAL DEDUCTIONS", f"PHP {peso(m['total_ded'])}"], ("LEFT", "LEFT", "RIGHT")))
@@ -296,6 +300,7 @@ def export_pdf(m, path):
 
     c = ps(8, False, alignment=TA_CENTER)
     ci = ParagraphStyle("i", parent=c, fontName="Helvetica-Oblique")
+    """Generates formal document footer with signature baselines for HR, Manager, and Employee"""
     sig = Table([[Paragraph(m["hr_name"], c), "", Paragraph(m["mgr_name"], c), "", Paragraph(e["name"], c)],
                  [Paragraph(f"Prepared by ({m['hr_title']})", ci), "",
                   Paragraph(f"Approved by ({m['mgr_title']})", ci), "", Paragraph("Received by", ci)]],
