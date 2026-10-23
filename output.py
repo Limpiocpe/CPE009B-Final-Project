@@ -93,7 +93,7 @@ class PayslipView(ttk.Frame):
 
     def __init__(self, parent):
         super().__init__(parent)
-        self.sf = theme.ScrollFrame(self, bg="#E3E8F0")
+        self.sf = theme.ScrollFrame(self, bg=theme.CANVAS)
         self.sf.pack(fill="both", expand=True)
         self.paper = tk.Frame(self.sf.inner, bg=PAPER, padx=24, pady=14, highlightthickness=1,
                               highlightbackground=theme.LINE)
@@ -344,8 +344,8 @@ class PayslipPreview(tk.Toplevel):
         view = PayslipView(self)
         view.pack(fill="both", expand=True)
         view.show(model)
-        bar = ttk.Frame(self)
-        bar.pack(fill="x", padx=10, pady=8)
+        bar = ttk.Frame(self, padding=(14, 10))
+        bar.pack(fill="x")
         ttk.Button(bar, text="Save as PDF", style="Primary.TButton",
                    command=lambda: export_pdf_dialog(model, file_name, self)).pack(side="left")
         ttk.Button(bar, text="Close", command=self.destroy).pack(side="right")

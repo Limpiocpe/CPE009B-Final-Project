@@ -45,10 +45,10 @@ class NoPayslip(ValueError):
 
 
 def card(parent, title):
-    lf = ttk.LabelFrame(parent, text=title, padding=(8, 4, 8, 10))
-    lf.pack(fill="x", pady=(0, 10), padx=(0, 6))
-    lf.columnconfigure((0, 1), weight=1, uniform="c")
-    return lf
+    c = theme.Card(parent, title)
+    c.pack(fill="x", pady=(0, 12), padx=(0, 8))
+    c.body.columnconfigure((0, 1), weight=1, uniform="c")
+    return c.body
 
 
 def field(parent, row, col, label, kind, var, span=1, **kw):
@@ -76,7 +76,7 @@ class PayslipTab(ttk.Frame):
             ("pagibig_no", "Pag-IBIG MID No."), ("tin_no", "TIN")]
 
     def __init__(self, parent, app):
-        super().__init__(parent, padding=10)
+        super().__init__(parent)
         self.app, self.emps, self.cfg, self._job = app, {}, None, None
         self._loading, self._prev_expected = False, ""
         today = date.today()
@@ -140,7 +140,7 @@ class PayslipTab(ttk.Frame):
 
         # buttons + messages stay visible under the scrolling form
         bar = ttk.Frame(left)
-        bar.pack(fill="x", pady=(6, 0), padx=(0, 6))
+        bar.pack(fill="x", pady=(4, 0), padx=(0, 8))
         bar.columnconfigure((0, 1), weight=1, uniform="b")
         ttk.Button(bar, text="Generate Payslip", style="Primary.TButton", command=self.generate).grid(
             row=0, column=0, sticky="ew", padx=(0, 4))
@@ -332,40 +332,39 @@ class EmployeeTab(ttk.Frame):
               ("tin_no", "TIN No."), ("status", "Status")]
 
     def __init__(self, parent, app):
-        super().__init__(parent, padding=10)
+        super().__init__(parent)
         self.app = app
         self.f = {k: tk.StringVar() for k, _ in self.LABELS}
         self.f["status"].set("regular")
-        form = ttk.LabelFrame(self, text="Employee record (all fields required)", padding=(8, 4, 8, 10))
-        form.pack(side="left", fill="y")
-        form.columnconfigure(0, weight=1)
+        fc = theme.Card(self, "Employee record", "All fields are required.")
+        fc.pack(side="left", fill="y")
+        form = fc.body
+        form.columnconfigure((0, 1), weight=1, uniform="e")
         for i, (k, t) in enumerate(self.LABELS):
             kind = "combo" if k == "status" else "entry"
-            field(form, i, 0, t, kind, self.f[k], values=["regular", "probationary"])
+            field(form, i // 2, i % 2, t, kind, self.f[k], values=["regular", "probationary"]).configure(width=22)
         b = ttk.Frame(form, style="Card.TFrame")
-        b.grid(row=len(self.LABELS), column=0, pady=(10, 0), sticky="ew")
+        b.grid(row=len(self.LABELS) // 2, column=0, columnspan=2, pady=(10, 0), sticky="ew")
         b.columnconfigure((0, 1), weight=1, uniform="b")
         ttk.Button(b, text="Save", style="Primary.TButton", command=self.save).grid(row=0, column=0, sticky="ew", padx=4)
         ttk.Button(b, text="New", command=self.new).grid(row=0, column=1, sticky="ew", padx=4)
 
         right = ttk.Frame(self)
-        right.pack(side="left", fill="both", expand=True, padx=(12, 0))
-        ttk.Label(right, text="Search by name or ID", foreground=theme.MUTED).pack(anchor="w")
+        right.pack(side="left", fill="both", expand=True, padx=(16, 0))
         self.search = tk.StringVar()
+        ttk.Label(right, text="Search by name or ID. Select a row to edit it.", style="Sub.TLabel").pack(anchor="w", pady=(0, 4))
         s = ttk.Entry(right, textvariable=self.search)
-        s.pack(fill="x", pady=(2, 6))
+        s.pack(fill="x", pady=(0, 10))
         s.bind("<KeyRelease>", lambda _: self.refresh())
-        self.tree = ttk.Treeview(right, columns=("id", "name", "dept", "salary"), show="headings")
-        for c, t, w in (("id", "ID", 80), ("name", "Name", 220), ("dept", "Department", 150), ("salary", "Monthly salary", 110)):
-            self.tree.heading(c, text=t)
-            self.tree.column(c, width=w, anchor="e" if c == "salary" else "w")
-        self.tree.pack(fill="both", expand=True)
+        box, self.tree = theme.make_tree(right, ("id", "name", "dept", "salary"),
+                                         ("ID", "Name", "Department", "Monthly salary"), (80, 220, 150, 120), right=("salary",))
+        box.pack(fill="both", expand=True)
         self.tree.bind("<<TreeviewSelect>>", self.load)
 
     def refresh(self):
         self.tree.delete(*self.tree.get_children())
-        for e in db.list_employees(self.search.get()):
-            self.tree.insert("", "end", iid=e["employee_id"], values=(
+        for i, e in enumerate(db.list_employees(self.search.get())):
+            self.tree.insert("", "end", iid=e["employee_id"], tags=("odd",) if i % 2 else (), values=(
                 e["employee_id"], e["full_name"], e["department"], f"{e['monthly_basic_salary']:,.2f}"))
 
     def load(self, _=None):
@@ -399,31 +398,29 @@ class EmployeeTab(ttk.Frame):
 # ============================================================== PAYSLIPS TAB
 class PayslipListTab(ttk.Frame):
     def __init__(self, parent, app):
-        super().__init__(parent, padding=10)
+        super().__init__(parent)
         self.app = app
         cols = ("id", "employee", "period", "pay_date", "gross", "net", "status")
         heads = ("ID", "Employee", "Period", "Pay date", "Gross pay", "Net pay", "Status")
-        self.tree = ttk.Treeview(self, columns=cols, show="headings")
-        for c, t, w in zip(cols, heads, (50, 200, 210, 110, 110, 110, 90)):
-            self.tree.heading(c, text=t)
-            self.tree.column(c, width=w, anchor="e" if c in ("gross", "net") else "w")
-        self.tree.pack(fill="both", expand=True)
-        self.tree.bind("<Double-1>", lambda _: self.view())
         bar = ttk.Frame(self)
-        bar.pack(pady=8)
-        ttk.Button(bar, text="View / PDF", style="Primary.TButton", command=self.view).pack(side="left", padx=4)
+        bar.pack(fill="x", pady=(0, 10))
+        ttk.Button(bar, text="View / PDF", style="Primary.TButton", command=self.view).pack(side="left")
         if db.can(app.user["role"], "approve_payslip"):
-            ttk.Button(bar, text="Approve", command=self.approve).pack(side="left", padx=4)
-        ttk.Button(bar, text="Refresh", command=self.refresh).pack(side="left", padx=4)
+            ttk.Button(bar, text="Approve", command=self.approve).pack(side="left", padx=(8, 0))
+        ttk.Button(bar, text="Refresh", command=self.refresh).pack(side="left", padx=(8, 0))
+        ttk.Label(bar, text="Double-click a row to open it.", style="Sub.TLabel").pack(side="right")
+        box, self.tree = theme.make_tree(self, cols, heads, (50, 200, 210, 110, 110, 110, 90), right=("gross", "net"))
+        box.pack(fill="both", expand=True)
+        self.tree.bind("<Double-1>", lambda _: self.view())
 
     def refresh(self):
         self.tree.delete(*self.tree.get_children())
-        for p in db.list_payslips():
+        for i, p in enumerate(db.list_payslips()):
             e = db.get_employee(p["employee_id"])
-            self.tree.insert("", "end", iid=p["payslip_id"], values=(
+            self.tree.insert("", "end", iid=p["payslip_id"], tags=(p["status"],) if p["status"] in ("approved", "pending") else (("odd",) if i % 2 else ()), values=(
                 p["payslip_id"], e["full_name"] if e else p["employee_id"],
                 f"{fdate(p['period_start'])} - {fdate(p['period_end'])}", fdate(p["pay_date"]),
-                f"{p['gross_pay']:,.2f}", f"{p['net_pay']:,.2f}", p["status"]))
+                f"{p['gross_pay']:,.2f}", f"{p['net_pay']:,.2f}", str(p["status"]).capitalize()))
 
     def _selected(self):
         sel = self.tree.selection()
@@ -469,18 +466,20 @@ class SettingsTab(ttk.Frame):
         "PAGIBIG_CAP": "Pag-IBIG max per month", "BONUS_TAX_EXEMPT": "13th month tax-exempt up to"}
 
     def __init__(self, parent, app):
-        super().__init__(parent, padding=10)
+        super().__init__(parent)
         self.vars, self.cvars = {}, {k: tk.StringVar() for k, _ in self.COMPANY_LABELS}
-        left = ttk.LabelFrame(self, text="Company, HR & Manager (printed on payslips)", padding=(8, 4, 8, 10))
-        left.pack(side="left", fill="y", anchor="n")
+        lc = theme.Card(self, "Company, HR & Manager", "Printed on every payslip.")
+        lc.pack(side="left", fill="y", anchor="n")
+        left = lc.body
         left.columnconfigure(0, weight=1)
         for i, (k, t) in enumerate(self.COMPANY_LABELS):
             field(left, i, 0, t, "entry", self.cvars[k]).configure(width=38)
         ttk.Button(left, text="Save company info", style="Primary.TButton", command=self.save_company).grid(
             row=len(self.COMPANY_LABELS), column=0, sticky="ew", padx=4, pady=(10, 0))
 
-        right = ttk.LabelFrame(self, text="Rates (government rates change - edit, then save)", padding=(8, 4, 8, 10))
-        right.pack(side="left", fill="y", anchor="n", padx=(12, 0))
+        rc = theme.Card(self, "Rates", "Government rates change. Edit them here, then save.")
+        rc.pack(side="left", fill="y", anchor="n", padx=(16, 0))
+        right = rc.body
         self.box = ttk.Frame(right, style="Card.TFrame")
         self.box.pack(anchor="w")
         ttk.Button(right, text="Save rates", style="Primary.TButton", command=self.save).pack(anchor="w", pady=(10, 0))
@@ -516,6 +515,11 @@ class SettingsTab(ttk.Frame):
 
 # ==================================================================== APP
 class App(tk.Tk):
+    PAGES = {"Payslip": ("Payslip", "Pick an employee and a cut-off. The payslip updates as you type."),
+             "Employees": ("Employees", "Add people and keep their contribution numbers up to date."),
+             "Saved Payslips": ("Saved payslips", "Review generated payslips, approve them and export PDFs."),
+             "Settings": ("Settings", "Company details and the rates used in every computation.")}
+
     def __init__(self, user):
         super().__init__()
         theme.apply_theme(self)
@@ -523,20 +527,53 @@ class App(tk.Tk):
         self.title(f"Payslip System - {user['username']} ({user['role']})")
         self.geometry(f"1280x{min(900, self.winfo_screenheight() - 80)}")
         self.minsize(1100, 680)
-        self.nb = ttk.Notebook(self)
-        self.nb.pack(fill="both", expand=True, padx=6, pady=6)
-        role = user["role"]
-        for perm, cls, title in (("generate_payslip", PayslipTab, "Payslip"),
-                                 ("manage_employees", EmployeeTab, "Employees"),
-                                 ("view_payslips", PayslipListTab, "Saved Payslips"),
-                                 ("edit_settings", SettingsTab, "Settings")):
-            if db.can(role, perm):
-                self.nb.add(cls(self.nb, self), text=f"  {title}  ")
-        self.nb.bind("<<NotebookTabChanged>>", self._tab_changed)
-        self._tab_changed()
+        F = theme.FONT
 
-    def _tab_changed(self, _=None):
-        tab = self.nametowidget(self.nb.select())
+        top = tk.Frame(self, bg=theme.SIDEBAR)
+        top.pack(side="top", fill="x")
+        tk.Label(top, text="Payslip System", bg=theme.SIDEBAR, fg="white", font=(F, 13, "bold")).pack(
+            side="left", padx=(24, 28), pady=10)
+        side = top
+        main = ttk.Frame(self)
+        main.pack(side="top", fill="both", expand=True)
+        head = ttk.Frame(main, padding=(28, 20, 28, 8))
+        head.pack(fill="x")
+        self.h_title = ttk.Label(head, style="Title.TLabel")
+        self.h_title.pack(anchor="w")
+        self.h_sub = ttk.Label(head, style="Sub.TLabel")
+        self.h_sub.pack(anchor="w", pady=(2, 0))
+        self.stage = ttk.Frame(main, padding=(28, 6, 28, 20))
+        self.stage.pack(fill="both", expand=True)
+
+        self.tabs, self.nav, self.current = {}, {}, None
+        role = user["role"]
+        for perm, cls, name in (("generate_payslip", PayslipTab, "Payslip"),
+                                ("manage_employees", EmployeeTab, "Employees"),
+                                ("view_payslips", PayslipListTab, "Saved Payslips"),
+                                ("edit_settings", SettingsTab, "Settings")):
+            if db.can(role, perm):
+                self.tabs[name] = cls(self.stage, self)
+                item = theme.NavItem(side, name, lambda n=name: self.show(n))
+                item.pack(side="left")
+                self.nav[name] = item
+
+        who = tk.Label(top, text=f"{user['username']}  \u00b7  {'HR' if role == 'HR' else role.title()}",
+                       bg=theme.SIDEBAR, fg=theme.SIDEBAR_TXT, font=(F, 9))
+        who.pack(side="right", padx=24)
+        if self.tabs:
+            self.show(next(iter(self.tabs)))
+
+    def show(self, name):
+        if self.current:
+            self.tabs[self.current].pack_forget()
+            self.nav[self.current].set_active(False)
+        self.current = name
+        self.nav[name].set_active(True)
+        title, sub = self.PAGES[name]
+        self.h_title.config(text=title)
+        self.h_sub.config(text=sub)
+        tab = self.tabs[name]
+        tab.pack(fill="both", expand=True)
         if hasattr(tab, "refresh"):
             tab.refresh()
 
