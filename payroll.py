@@ -3,7 +3,8 @@ from datetime import timedelta
 
 from database import lookup_sss, lookup_tax
 
-
+# Essential floating-point stabilizer: adding an epsilon (1e-9) prevents Python from
+# rounding mid-point values down unpredictably, ensuring printed line items tally exactly to totals.
 def r2(x):
     """Round to centavos so the printed lines always add up to the printed totals."""
     return round(x + 1e-9, 2)
@@ -19,8 +20,11 @@ def weekdays_between(start, end):
 
 
 def compute_rates(monthly, cfg):
+    """Calculates the base daily wage using the configured monthly working days (e.g., 22 days)."""
     daily = monthly / cfg["WORKING_DAYS_PER_MONTH"]
+    """ Standard 8-hour workday conversion"""
     hourly = daily / cfg["HOURS_PER_DAY"]
+    """ Per-minute rate used directly to penalize exact tardiness/lates"""
     return daily, hourly, hourly / 60
 
 
@@ -46,23 +50,37 @@ def compute_payslip(emp, att, cfg, include_13th=False):
     gross = r2(basic_pay + ot_pay + night_diff_pay + holiday_pay + bonus)
 
     # ---- attendance deductions
+    """Deducts full daily rate for every full day absent recorded during the cut-off"""
     absent_ded = r2(daily * att["absent_days"])
+    """Deducts fine-grained lost time using the minute rate multiplied by total late minutes"""
     late_ded = r2(minute * att["late_minutes"])
 
     # ---- government contributions (monthly employee share / cutoffs)
+    """SSS: Looks up the exact employee share from the database bracket table,
+ then divides by cutoffs (e.g., 2 for semi-monthly / kinsenas pay)."""
     sss = r2(lookup_sss(monthly, cfg["SSS_TABLE"]) / cutoffs)
+    """PhilHealth: Clamps basic monthly salary between statutory minimum floor (10,000)
+    # and maximum ceiling (100,000) before computing the 5% total (divided by 2 for employee share). """
     ph_base = max(cfg["PHILHEALTH_MIN"], min(cfg["PHILHEALTH_MAX"], monthly))
     philhealth = r2(ph_base * cfg["PHILHEALTH_RATE"] / 2 / cutoffs)
+    """Pag-IBIG: Computes 2% of monthly basic pay, capped strictly at the statutory limit of PHP 200/month."""
     pagibig = r2(min(monthly * cfg["PAGIBIG_RATE"], cfg["PAGIBIG_CAP"]) / cutoffs)
+    """Sum of all non-taxable statutory employee contributions for this pay period"""
     gov = sss + philhealth + pagibig
 
     # ---- withholding tax (annualized; 13th month exempt up to the cap)
+    """TRAIN Law Tax & Net Pay Computation"""
+    """TRAIN Law exemption: 13th month / bonuses are non-taxable up to PHP 90,000 per year. The exemption is pro-rated for the cut-off period."""
     exempt = min(bonus, cfg["BONUS_TAX_EXEMPT"])
+    """Taxable Income: Gross pay minus tax-exempt bonuses, attendance deductions, and mandatory gov contributions. max(0.0, ...) protects against negative taxable base if deductions exceed cut-off pay."""
     taxable = max(0.0, gross - exempt - absent_ded - late_ded - gov)
+    """Annualizes taxable income to evaluate against progressive annual tax brackets,then de-annualizes back down to the current pay period cut-off."""
     periods_per_year = cutoffs * 12
     tax = r2(lookup_tax(taxable * periods_per_year, cfg["TAX_TABLE"]) / periods_per_year)
 
+    """Total deductions to be withheld from the employee's pay"""
     total_ded = r2(absent_ded + late_ded + sss + philhealth + pagibig + tax)
+    """Final Net Take-Home Pay (Gross Pay - Total Deductions). Stored alongside all itemized figures in a single result dictionary"""
     return dict(basic_pay=basic_pay, ot_pay=ot_pay, night_diff_pay=night_diff_pay,
                 holiday_pay=holiday_pay, holiday_regular=holiday_regular, holiday_special=holiday_special,
                 bonus=bonus, gross=gross,
