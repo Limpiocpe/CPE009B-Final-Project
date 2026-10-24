@@ -1,5 +1,53 @@
 """main.py - Payslip System. Run:  python main.py
 Logins: hr / hr123 (HR)   manager / manager123 (MANAGER)"""
+
+"""
+main.py
+
+
+INDEX  (function - line number)
+  num()                    - 69
+  parse_date()             - 86
+  NoPayslip                - 95
+  card()                   - 100
+  field()                  - 107
+  PayslipTab               - 125
+      __init__()           - 132
+      destroy()            - 220
+      refresh()            - 227
+      _picked()            - 239
+      _fill_info()         - 245
+      period()             - 256
+      _period_changed()    - 269
+      _expected_changed()  - 289
+      _schedule()          - 297
+      _update_absent()     - 304
+      preview()            - 312
+      _collect()           - 331
+      generate()           - 355
+      save_pdf()           - 383
+      reset()              - 391
+  EmployeeTab              - 403
+      __init__()           - 409
+      refresh()            - 440
+      load()               - 447
+      new()                - 455
+      save()               - 460
+  PayslipListTab           - 479
+      __init__()           - 480
+      refresh()            - 498
+      _selected()          - 508
+      view()               - 516
+      approve()            - 530
+  SettingsTab              - 539
+      __init__()           - 556
+      refresh()            - 576
+      save()               - 590
+      save_company()       - 599
+  App                      - 609
+      __init__()           - 616
+      show()               - 668
+"""
 import calendar
 import ctypes
 import os
