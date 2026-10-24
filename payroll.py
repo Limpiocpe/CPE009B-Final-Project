@@ -1,3 +1,17 @@
+"""
+payroll.py
+
+
+INDEX  (function - line number)
+  r2()                     - 18
+  weekdays_between()       - 23
+  compute_rates()          - 32
+  compute_payslip()        - 41
+  result_to_row()          - 106
+  row_to_result()          - 115
+"""
+
+
 """payroll.py - all computation logic. Pure functions, no GUI."""
 from datetime import timedelta
 
