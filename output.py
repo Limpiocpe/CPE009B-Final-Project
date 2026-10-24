@@ -1,3 +1,25 @@
+"""
+output.py
+
+
+INDEX  (function - line number)
+  peso()                   - 33
+  fdate()                  - 38
+  _n()                     - 42
+  _pct()                   - 48
+  build_model()            - 54
+  PayslipView              - 115
+      __init__()           - 118
+      _clear()             - 127
+      show_message()       - 132
+      show()               - 137
+      _draw()              - 145
+  export_pdf()             - 248
+  export_pdf_dialog()      - 362
+  PayslipPreview           - 376
+      __init__()           - 379
+"""
+
 """output.py - payslip model, on-screen payslip (live preview), preview window and PDF export.
 
 build_model() turns the computed numbers into one plain dict. BOTH the screen view and the PDF are
