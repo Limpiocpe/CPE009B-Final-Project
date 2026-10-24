@@ -1,3 +1,18 @@
+"""
+config.py
+
+
+INDEX  (function - line number)
+  DB_PATH                  - 17
+  USERS                    - 20
+  PERMISSIONS              - 23
+  COMPANY                  - 29
+  SETTINGS                 - 39
+  SSS_TABLE                - 56
+  TAX_TABLE                - 60
+  DUMMY_EMPLOYEES          - 65
+"""
+
 """config.py - default seed data. Seeded into the SQLite DB on first run;
 after that, edit rates and company/HR/manager names in the app's Settings tab (stored in the DB)."""
 import os
