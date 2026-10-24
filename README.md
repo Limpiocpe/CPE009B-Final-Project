@@ -1,9 +1,6 @@
 <img width="1000" height="220" alt="banner" src="https://github.com/user-attachments/assets/39ba0967-b569-45ca-89a0-cdfaad1aece4" /><svg xmlns="http://www.w3.org/2000/svg" width="1000" height="220" viewBox="0 0 1000 220">
   <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1D4ED8"/><stop offset="1" stop-color="#0F172A"/></linearGradient></defs>
-
-
-# CPE009B (OOP2) Final Project · Group 5 - Payslip System
-
+  
 ## 📖 About
 
 The Orbit company handled payslips manually, which was slow and prone to computation errors. This project automates the process with a Python program that computes employee salaries and generates payslips.
