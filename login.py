@@ -4,6 +4,13 @@ from tkinter import ttk
 import database as db
 import theme
 
+"""
+login.py
+
+
+INDEX  (function - line number)
+  ask_login()              - 14
+"""
 
 # shows the login window, returns the user if correct, otherwise None
 def ask_login():
