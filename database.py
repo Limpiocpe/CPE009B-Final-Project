@@ -3,6 +3,37 @@ import hashlib, hmac, os, sqlite3
 from datetime import datetime
 import config
 
+"""
+database.py
+
+
+INDEX  (function - line number)
+  connect()                - 62
+  run()                    - 69
+  query()                  - 80
+  hash_password()          - 89
+  _add_columns()           - 96
+  _migrate()               - 104
+  init_db()                - 114
+  authenticate()           - 141
+  can()                    - 152
+  load_config()            - 158
+  update_setting()         - 171
+  update_company()         - 182
+  lookup_sss()             - 191
+  lookup_tax()             - 196
+  save_employee()          - 208
+  get_employee()           - 220
+  list_employees()         - 226
+  save_attendance()        - 233
+  get_attendance()         - 252
+  save_payslip()           - 260
+  list_payslips()          - 267
+  find_payslip()           - 274
+  delete_payslip()         - 281
+  approve_payslip()        - 286
+"""
+
 # table definitions, only created if they don't exist yet
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, password_hash TEXT, salt TEXT, role TEXT);
