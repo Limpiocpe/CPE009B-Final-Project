@@ -1,3 +1,21 @@
+"""
+theme.py
+
+
+INDEX  (function - line number)
+  apply_theme()            - 32
+  _on_wheel()              - 110
+  Card                     - 121
+      __init__()           - 124
+  NavItem                  - 134
+      __init__()           - 137
+      _paint()             - 150
+      set_active()         - 156
+  make_tree()              - 161
+  ScrollFrame              - 178
+      __init__()           - 181
+"""
+
 """theme.py - colours, ttk styles and small UI helpers (Card, NavItem, tree helper, ScrollFrame) shared by every window."""
 import tkinter as tk
 from tkinter import ttk, font as tkfont
