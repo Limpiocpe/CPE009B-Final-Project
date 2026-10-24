@@ -24,3 +24,23 @@ HR enters the employee's details, days worked, overtime, holiday work, night shi
 |---|---|
 | **HR** | Manage employees, encode attendance, generate payslips, view saved payslips, edit settings |
 | **Manager** | View saved payslips and approve them |
+
+## 🧮 How Pay Is Computed
+
+All formulas live in [`payroll.py`](payroll.py). Rates are configurable in the **Settings** tab.
+
+| Item | Computation |
+|---|---|
+| Basic pay | Monthly salary ÷ cut-offs per month (2) |
+| Daily / hourly / minute rate | Monthly ÷ 22 working days, ÷ 8 hours, ÷ 60 minutes |
+| Overtime | Hourly rate × 1.25 × OT hours |
+| Night differential | Hourly rate × 10% × night hours |
+| Holiday pay | Extra pay over a normal day: regular holiday 200%, special holiday 130% |
+| 13th-month (optional) | One month's salary minus days absent |
+| **Gross pay** | Basic + overtime + night differential + holiday + 13th-month |
+| Absence / late deduction | Daily rate × days absent · Minute rate × minutes late |
+| SSS | Employee share from the bracket table (5% of monthly salary credit) ÷ cut-offs |
+| PhilHealth | 5% premium on salary (₱10,000–₱100,000), employee pays half ÷ cut-offs |
+| Pag-IBIG | 2% of salary, capped at ₱200/month ÷ cut-offs |
+| Withholding tax | Taxable pay annualized, run through the TRAIN brackets, then divided back per cut-off |
+| **Net pay** | Gross pay − total deductions |
