@@ -33,9 +33,8 @@ def weekdays_between(start, end):
     return n
 
 
-def compute_rates(monthly, cfg):
-    """Calculates the base daily wage using the configured monthly working days (e.g., 22 days)."""
-    daily = monthly / cfg["WORKING_DAYS_PER_MONTH"]
+def compute_rates(daily, cfg):
+    """The daily rate is the employee's set rate; the hourly and per-minute rates come from it."""
     """ Standard 8-hour workday conversion"""
     hourly = daily / cfg["HOURS_PER_DAY"]
     """ Per-minute rate used directly to penalize exact tardiness/lates"""
@@ -48,9 +47,11 @@ def compute_payslip(emp, att, cfg, include_13th=False):
                regular_holiday_days, special_holiday_days).
     Returns one result dict (every money value already rounded to 2 decimals)."""
     # get the salary and the rates
-    monthly = emp["monthly_basic_salary"]
+    daily_rate = emp["daily_rate"]
     cutoffs = int(cfg["CUTOFFS_PER_MONTH"])
-    daily, hourly, minute = compute_rates(monthly, cfg)
+    daily, hourly, minute = compute_rates(daily_rate, cfg)
+    # monthly salary = daily rate x working days per month (used for basic pay and contributions)
+    monthly = daily * cfg["WORKING_DAYS_PER_MONTH"]
 
     # ---- earnings
     basic_pay = r2(monthly / cutoffs)                                   # fixed half-month (kinsenas)
@@ -74,7 +75,7 @@ def compute_payslip(emp, att, cfg, include_13th=False):
     """Deducts full daily rate for every full day absent recorded during the cut-off"""
     absent_ded = r2(daily * att["absent_days"])
     """Deducts fine-grained lost time using the minute rate multiplied by total tardiness minutes"""
-    tardiness_ded = r2(minute * att["late_minutes"])
+    late_ded = r2(minute * att["late_minutes"])
 
     # ---- government contributions (monthly employee share / cutoffs)
     """SSS: Looks up the exact employee share from the database bracket table,

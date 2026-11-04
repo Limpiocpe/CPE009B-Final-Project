@@ -41,7 +41,7 @@ COMPANY = dict(
 
 # default rates, these can be changed later in the Settings tab
 SETTINGS = {
-    "WORKING_DAYS_PER_MONTH": 22,    # daily rate = monthly salary / this
+    "WORKING_DAYS_PER_MONTH": 22,    # monthly salary = daily rate x this
     "HOURS_PER_DAY": 8,
     "OT_RATE": 1.25,                 # overtime = 125% of hourly rate
     "NIGHT_DIFF_RATE": 0.10,         # night differential = +10% of hourly rate (10PM-6AM)
@@ -68,18 +68,18 @@ TAX_TABLE = [(0, 250000, 0, 0.0), (250000, 400000, 0, 0.15), (400000, 800000, 22
 # sample employees, added to the database on the first run
 DUMMY_EMPLOYEES = [
     dict(employee_id="EMP-001", full_name="Katindig, Jiro Luis A.", position="Software Developer",
-         department="IT Department", monthly_basic_salary=30000, sss_no="34-1234567-8",
-         philhealth_no="12-345678901-2", pagibig_no="1234-5678-9012", tin_no="123-456-789-000", status="regular"),
+         department="IT Department", monthly_basic_salary=30800, daily_rate=1400, sss_no="34-1234567-8",
+         philhealth_no="12-345678901-2", pagibig_no="1234-5678-9012", tin_no="123-456-789-000", status="Regular"),
     dict(employee_id="EMP-002", full_name="Clint Hoven Estorco", position="Employee",
-         department="Unassigned", monthly_basic_salary=0, sss_no="",
-         philhealth_no="", pagibig_no="", tin_no="", status="regular"),
+         department="Unassigned", monthly_basic_salary=0, daily_rate=0, sss_no="",
+         philhealth_no="", pagibig_no="", tin_no="", status="Regular"),
     dict(employee_id="EMP-003", full_name="Ramelissa Melith Limpio", position="Employee",
-         department="Unassigned", monthly_basic_salary=0, sss_no="",
-         philhealth_no="", pagibig_no="", tin_no="", status="regular"),
+         department="Unassigned", monthly_basic_salary=0, daily_rate=0, sss_no="",
+         philhealth_no="", pagibig_no="", tin_no="", status="Regular"),
     dict(employee_id="EMP-004", full_name="Eunice Moradillo", position="Employee",
-         department="Unassigned", monthly_basic_salary=0, sss_no="",
-         philhealth_no="", pagibig_no="", tin_no="", status="regular"),
+         department="Unassigned", monthly_basic_salary=0, daily_rate=0, sss_no="",
+         philhealth_no="", pagibig_no="", tin_no="", status="Regular"),
     dict(employee_id="EMP-005", full_name="Jaime Demain", position="Employee",
-         department="Unassigned", monthly_basic_salary=0, sss_no="",
-         philhealth_no="", pagibig_no="", tin_no="", status="regular"),
+         department="Unassigned", monthly_basic_salary=0, daily_rate=0, sss_no="",
+         philhealth_no="", pagibig_no="", tin_no="", status="Regular"),
 ]

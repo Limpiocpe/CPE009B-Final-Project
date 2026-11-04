@@ -44,8 +44,8 @@ CREATE TABLE IF NOT EXISTS sss_table (salary_min REAL, salary_max REAL, employee
 CREATE TABLE IF NOT EXISTS tax_table (bracket_min REAL, bracket_max REAL, base_tax REAL, rate REAL);
 CREATE TABLE IF NOT EXISTS employees (
     employee_id TEXT PRIMARY KEY, full_name TEXT NOT NULL, position TEXT, department TEXT,
-    monthly_basic_salary REAL NOT NULL, sss_no TEXT, philhealth_no TEXT, pagibig_no TEXT,
-    tin_no TEXT, status TEXT DEFAULT 'regular');
+    monthly_basic_salary REAL NOT NULL, daily_rate REAL DEFAULT 0, sss_no TEXT, philhealth_no TEXT, pagibig_no TEXT,
+    tin_no TEXT, status TEXT DEFAULT 'Regular');
 CREATE TABLE IF NOT EXISTS attendance (
     employee_id TEXT, period_start TEXT, period_end TEXT, days_worked REAL, absent_days REAL,
     late_minutes REAL, ot_hours REAL, night_diff_hours REAL, expected_days REAL,
@@ -111,6 +111,12 @@ def _migrate(conn):
                                       "special_holiday_days": "REAL DEFAULT 0"})
     for col in ("hr_name", "hr_title", "manager_name", "manager_title"):
         conn.execute(f"UPDATE company SET {col}=? WHERE {col} IS NULL OR {col}=''", (config.COMPANY[col],))
+    # salary is now based on the daily rate; old records get their rate from the monthly salary
+    _add_columns(conn, "employees", {"daily_rate": "REAL DEFAULT 0"})
+    row = conn.execute("SELECT value FROM settings WHERE key='WORKING_DAYS_PER_MONTH'").fetchone()
+    days = row[0] if row else config.SETTINGS["WORKING_DAYS_PER_MONTH"]
+    conn.execute("UPDATE employees SET daily_rate = ROUND(monthly_basic_salary / ?, 2) "
+                 "WHERE (daily_rate IS NULL OR daily_rate = 0) AND monthly_basic_salary > 0", (days,))
 
 
 # creates the tables and adds the default data on the first run
@@ -133,7 +139,7 @@ def init_db():
                 conn.executemany("INSERT INTO tax_table VALUES (?,?,?,?)", config.TAX_TABLE)
             if not conn.execute("SELECT 1 FROM employees").fetchone():
                 for e in config.DUMMY_EMPLOYEES:
-                    conn.execute(f"INSERT INTO employees ({','.join(EMP_FIELDS)}) VALUES ({','.join('?' * 10)})",
+                    conn.execute(f"INSERT INTO employees ({','.join(EMP_FIELDS)}) VALUES ({','.join('?' * len(EMP_FIELDS))})",
                                  [e[f] for f in EMP_FIELDS])
     finally:
         conn.close()
@@ -203,7 +209,7 @@ def lookup_tax(annual_taxable, tax_table):
 
 # ------------------------------------------------------------ employees
 # employee columns in the order they are saved
-EMP_FIELDS = ["employee_id", "full_name", "position", "department", "monthly_basic_salary",
+EMP_FIELDS = ["employee_id", "full_name", "position", "department", "monthly_basic_salary", "daily_rate",
               "sss_no", "philhealth_no", "pagibig_no", "tin_no", "status"]
 
 
@@ -213,10 +219,14 @@ def save_employee(emp):
     for f in ("employee_id", "full_name", "position", "department"):
         if not str(emp.get(f, "")).strip():
             raise ValueError(f"{f} cannot be blank.")
-    if float(emp.get("monthly_basic_salary", 0)) <= 0:
-        raise ValueError("Salary must be greater than zero.")
-    values = [emp.get(f, "regular" if f == "status" else "") for f in EMP_FIELDS]
-    run(f"INSERT OR REPLACE INTO employees ({','.join(EMP_FIELDS)}) VALUES ({','.join('?' * 10)})", values)
+    if float(emp.get("daily_rate", 0)) <= 0:
+        raise ValueError("Daily rate must be greater than zero.")
+    # monthly salary is worked out from the daily rate (daily rate x working days per month)
+    row = query("SELECT value FROM settings WHERE key='WORKING_DAYS_PER_MONTH'")
+    days = row[0]["value"] if row else config.SETTINGS["WORKING_DAYS_PER_MONTH"]
+    emp = dict(emp, monthly_basic_salary=round(float(emp["daily_rate"]) * days, 2))
+    values = [emp.get(f, "Regular" if f == "status" else "") for f in EMP_FIELDS]
+    run(f"INSERT OR REPLACE INTO employees ({','.join(EMP_FIELDS)}) VALUES ({','.join('?' * len(EMP_FIELDS))})", values)
 
 
 # gets one employee by ID

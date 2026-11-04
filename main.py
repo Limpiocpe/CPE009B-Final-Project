@@ -129,7 +129,7 @@ def field(parent, row, col, label, kind, var, span=1, **kw):
 class PayslipTab(ttk.Frame):
     # fields shown in the employee box (display only)
     INFO = [("full_name", "Full name"), ("employee_id", "Employee ID"), ("department", "Department"),
-            ("position", "Position"), ("salary", "Monthly salary (PHP)"), ("status", "Status"),
+            ("position", "Position"), ("salary", "Daily rate (PHP)"), ("status", "Status"),
             ("sss_no", "SSS No."), ("philhealth_no", "PhilHealth No."),
             ("pagibig_no", "Pag-IBIG MID No."), ("tin_no", "TIN")]
 
@@ -237,7 +237,7 @@ class PayslipTab(ttk.Frame):
         self.emps = {f"{e['employee_id']} - {e['full_name']}": e for e in db.list_employees()}
         self.emp_cb["values"] = list(self.emps)
         if self.emp.get() not in self.emps:
-            ready = [k for k, e in self.emps.items() if e["monthly_basic_salary"] > 0]
+            ready = [k for k, e in self.emps.items() if e["daily_rate"] > 0]
             self.emp.set(ready[0] if ready else next(iter(self.emps), ""))
         self._fill_info()
         self.preview()
@@ -253,7 +253,7 @@ class PayslipTab(ttk.Frame):
         e = self.emps.get(self.emp.get())
         for k, _ in self.INFO:
             if k == "salary":
-                val = f"{e['monthly_basic_salary']:,.2f}" if e else ""
+                val = f"{e['daily_rate']:,.2f}" if e else ""
             else:
                 val = (e.get(k) or "") if e else ""
             self.info[k].set(val)
@@ -339,8 +339,8 @@ class PayslipTab(ttk.Frame):
         emp = self.emps.get(self.emp.get())
         if not emp:
             raise NoPayslip("Pick an employee to see the payslip.")
-        if emp["monthly_basic_salary"] <= 0:
-            raise NoPayslip(f"{emp['full_name']} has no monthly salary yet.\nSet it in the Employees tab.")
+        if emp["daily_rate"] <= 0:
+            raise NoPayslip(f"{emp['full_name']} has no daily rate yet.\nSet it in the Employees tab.")
         expected = num(self.expected, "Expected work days", strict)
         worked = num(self.worked, "Days worked", strict)
         if expected <= 0:
@@ -409,7 +409,7 @@ class PayslipTab(ttk.Frame):
 # employees tab: add and edit employee records
 class EmployeeTab(ttk.Frame):
     LABELS = [("employee_id", "Employee ID"), ("full_name", "Full Name"), ("position", "Position"),
-              ("department", "Department"), ("monthly_basic_salary", "Monthly Basic Salary"),
+              ("department", "Department"), ("daily_rate", "Daily Rate"),
               ("sss_no", "SSS No."), ("philhealth_no", "PhilHealth No."), ("pagibig_no", "Pag-IBIG MID No."),
               ("tin_no", "TIN No."), ("status", "Status")]
 
@@ -417,14 +417,14 @@ class EmployeeTab(ttk.Frame):
         super().__init__(parent)
         self.app = app
         self.f = {k: tk.StringVar() for k, _ in self.LABELS}
-        self.f["status"].set("regular")
+        self.f["status"].set("Regular")
         fc = theme.Card(self, "Employee record", "All fields are required.")
         fc.pack(side="left", fill="y")
         form = fc.body
         form.columnconfigure((0, 1), weight=1, uniform="e")
         for i, (k, t) in enumerate(self.LABELS):
             kind = "combo" if k == "status" else "entry"
-            field(form, i // 2, i % 2, t, kind, self.f[k], values=["regular", "probationary"]).configure(width=22)
+            field(form, i // 2, i % 2, t, kind, self.f[k], values=["Regular", "Probationary"]).configure(width=22)
         b = ttk.Frame(form, style="Card.TFrame")
         b.grid(row=len(self.LABELS) // 2, column=0, columnspan=2, pady=(10, 0), sticky="ew")
         b.columnconfigure((0, 1), weight=1, uniform="b")
@@ -439,7 +439,7 @@ class EmployeeTab(ttk.Frame):
         s.pack(fill="x", pady=(0, 10))
         s.bind("<KeyRelease>", lambda _: self.refresh())
         box, self.tree = theme.make_tree(right, ("id", "name", "dept", "salary"),
-                                         ("ID", "Name", "Department", "Monthly salary"), (80, 220, 150, 120), right=("salary",))
+                                         ("ID", "Name", "Department", "Daily rate"), (80, 220, 150, 120), right=("salary",))
         box.pack(fill="both", expand=True)
         self.tree.bind("<<TreeviewSelect>>", self.load)
 
@@ -448,7 +448,7 @@ class EmployeeTab(ttk.Frame):
         self.tree.delete(*self.tree.get_children())
         for i, e in enumerate(db.list_employees(self.search.get())):
             self.tree.insert("", "end", iid=e["employee_id"], tags=("odd",) if i % 2 else (), values=(
-                e["employee_id"], e["full_name"], e["department"], f"{e['monthly_basic_salary']:,.2f}"))
+                e["employee_id"], e["full_name"], e["department"], f"{e['daily_rate']:,.2f}"))
 
     # fills the form with the selected employee
     def load(self, _=None):
@@ -461,7 +461,7 @@ class EmployeeTab(ttk.Frame):
     # clears the form
     def new(self):
         for k, v in self.f.items():
-            v.set("regular" if k == "status" else "")
+            v.set("Regular" if k == "status" else "")
 
     # checks the fields then saves the employee
     def save(self):
@@ -471,9 +471,9 @@ class EmployeeTab(ttk.Frame):
                 if not emp[k]:
                     raise ValueError(f"{t} cannot be blank.")
             try:
-                emp["monthly_basic_salary"] = float(emp["monthly_basic_salary"].replace(",", ""))
+                emp["daily_rate"] = float(emp["daily_rate"].replace(",", ""))
             except ValueError:
-                raise ValueError("Monthly Basic Salary must be a number.")
+                raise ValueError("Daily Rate must be a number.")
             db.save_employee(emp)
         except ValueError as ex:
             return messagebox.showerror("Employee", str(ex))
@@ -551,7 +551,7 @@ class SettingsTab(ttk.Frame):
                       ("manager_title", "Manager title")]
     # readable names for each rate
     RATE_LABELS = {
-        "WORKING_DAYS_PER_MONTH": "Working days per month (daily rate = salary / this)",
+        "WORKING_DAYS_PER_MONTH": "Working days per month (monthly salary = daily rate x this)",
         "HOURS_PER_DAY": "Hours per day", "OT_RATE": "Overtime rate (1.25 = +25%)",
         "NIGHT_DIFF_RATE": "Night differential (0.10 = +10%)",
         "REGULAR_HOLIDAY_RATE": "Regular holiday worked (2 = double)",

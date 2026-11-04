@@ -60,8 +60,8 @@ def _pct(x):
 def build_model(emp, company, period, att, r, cfg, status="draft", approved_by=None):
     """emp/company/period/att/r as used by payroll.compute_payslip -> dict ready to draw."""
     # work out the rates and dates first
-    monthly = emp["monthly_basic_salary"]
-    daily, hourly, minute = payroll.compute_rates(monthly, cfg)
+    daily, hourly, minute = payroll.compute_rates(emp["daily_rate"], cfg)
+    monthly = daily * cfg["WORKING_DAYS_PER_MONTH"]
     sd, ed = date.fromisoformat(period["start"]), date.fromisoformat(period["end"])
     cal_days = (ed - sd).days + 1
     expected = att.get("expected_days") or payroll.weekdays_between(sd, ed)
