@@ -95,8 +95,14 @@ def build_model(emp, company, period, att, r, cfg, status="draft", approved_by=N
         ("SSS Contribution", f"SSS No. {emp['sss_no'] or '-'}", r["sss"]),
         ("PhilHealth", f"PhilHealth No. {emp['philhealth_no'] or '-'}", r["philhealth"]),
         ("Pag-IBIG", f"MID No. {emp['pagibig_no'] or '-'}", r["pagibig"]),
-        ("Withholding Tax", f"TIN {emp['tin_no'] or '-'}", r["tax"]),
-    ]
+        ("Withholding Tax", f"TIN {emp['tin_no'] or '-'}", r["tax"]),]
+    
+        # append loan rows if present
+    if r.get("sss_loan", 0) > 0:
+        deductions.append(("SSS Loan", "Salary / Calamity Loan", r["sss_loan"]))
+    if r.get("pagibig_loan", 0) > 0:
+        deductions.append(("Pag-IBIG Loan", "Multi-Purpose / Housing Loan", r["pagibig_loan"]))
+
     # everything the payslip needs, in one dict
     return dict(
         company=dict(name=company["name"], address=company["address"], tin=company["tin"],
@@ -110,7 +116,7 @@ def build_model(emp, company, period, att, r, cfg, status="draft", approved_by=N
         cutoff=period.get("kinsena", "").replace("Kinsena", "Cutoff"),
         monthly=peso(monthly), daily=peso(daily),
         period_line=f"Period: {fdate(period['start'])} - {fdate(period['end'])}   |   Cut-off duration: {cal_days} days",
-        attend_line=f"Days worked: {worked:g} / {expected:g}   |   Absent: {absent:g}   |   Late: {late:g} min",
+        attend_line=f"Days worked: {worked:g} / {expected:g}   |   Absent: {absent:g}   |   Tardiness: {late:g} min",
         earnings=earnings, gross=r["gross"], deductions=deductions, total_ded=r["total_ded"], net=r["net"],
         note="Holiday pay shows only the extra premium - the day's regular pay is already inside Basic Pay.",
         status=status, approved_by=approved_by)
