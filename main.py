@@ -149,7 +149,8 @@ class PayslipTab(ttk.Frame):
         self.duration = tk.StringVar()
         self.expected, self.worked, self.absent = tk.StringVar(), tk.StringVar(), tk.StringVar(value="0")
         self.v = {k: tk.StringVar(value="0") for k in
-                  ("late_minutes", "ot_hours", "night_diff_hours", "regular_holiday_days", "special_holiday_days")}
+                  ("late_minutes", "ot_hours", "night_diff_hours", "regular_holiday_days", "special_holiday_days",
+                   "sss_loan", "pagibig_loan")}
         self.bonus = tk.BooleanVar()
 
         # layout: form on the left, payslip on the right
@@ -187,15 +188,17 @@ class PayslipTab(ttk.Frame):
         field(att, 0, 0, "Expected work days", "spin", self.expected, to=31)
         field(att, 0, 1, "Days worked (8 hrs)", "spin", self.worked, to=31)
         field(att, 1, 0, "Absent days (auto)", "ro", self.absent)
-        field(att, 1, 1, "Late (minutes)", "spin", self.v["late_minutes"], to=9999, inc=5)
+        field(att, 1, 1, "Tardiness (minutes)", "spin", self.v["late_minutes"], to=9999, inc=5)
         field(att, 2, 0, "Overtime hours", "spin", self.v["ot_hours"], to=999, inc=0.5)
         field(att, 2, 1, "Night diff hours (10PM onwards)", "spin", self.v["night_diff_hours"], to=999, inc=0.5)
         field(att, 3, 0, "Regular holiday worked (double)", "spin", self.v["regular_holiday_days"], to=31)
         field(att, 3, 1, "Special holiday worked (+30%)", "spin", self.v["special_holiday_days"], to=31)
+        field(att, 4, 0, "SSS Loan (PHP)", "entry", self.v["sss_loan"])
+        field(att, 4, 1, "Pag-IBIG Loan (PHP)", "entry", self.v["pagibig_loan"])
         ttk.Checkbutton(att, text="Include 13th month / bonus  (1 month - absent)", variable=self.bonus,
-                        style="TCheckbutton").grid(row=4, column=0, columnspan=2, sticky="w", padx=4, pady=(8, 0))
+                        style="TCheckbutton").grid(row=5, column=0, columnspan=2, sticky="w", padx=4, pady=(8, 0))
         ttk.Button(att, text="Reset attendance", style="Link.TButton", command=self.reset).grid(
-            row=5, column=1, sticky="e", pady=(4, 0))
+            row=6, column=1, sticky="e", pady=(4, 0))
 
         # update the payslip when any value changes
         for v in (self.expected, self.worked, self.pay, *self.v.values()):
