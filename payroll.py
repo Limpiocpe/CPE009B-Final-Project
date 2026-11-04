@@ -66,11 +66,15 @@ def compute_payslip(emp, att, cfg, include_13th=False):
     # gross pay = all the earnings added together
     gross = r2(basic_pay + ot_pay + night_diff_pay + holiday_pay + bonus)
 
+    # ---- loans (SSS / Pag-IBIG)
+    sss_loan = r2(att.get("sss_loan", 0.0))
+    pagibig_loan = r2(att.get("pagibig_loan", 0.0))
+    
     # ---- attendance deductions
     """Deducts full daily rate for every full day absent recorded during the cut-off"""
     absent_ded = r2(daily * att["absent_days"])
-    """Deducts fine-grained lost time using the minute rate multiplied by total late minutes"""
-    late_ded = r2(minute * att["late_minutes"])
+    """Deducts fine-grained lost time using the minute rate multiplied by total tardiness minutes"""
+    tardiness_ded = r2(minute * att["late_minutes"])
 
     # ---- government contributions (monthly employee share / cutoffs)
     """SSS: Looks up the exact employee share from the database bracket table,
@@ -97,13 +101,14 @@ def compute_payslip(emp, att, cfg, include_13th=False):
     tax = r2(lookup_tax(taxable * periods_per_year, cfg["TAX_TABLE"]) / periods_per_year)
 
     """Total deductions to be withheld from the employee's pay"""
-    total_ded = r2(absent_ded + late_ded + sss + philhealth + pagibig + tax)
+    total_ded = r2(absent_ded + late_ded + sss + philhealth + pagibig + tax + sss_loan + pagibig_loan)
     """Final Net Take-Home Pay (Gross Pay - Total Deductions). Stored alongside all itemized figures in a single result dictionary"""
     return dict(basic_pay=basic_pay, ot_pay=ot_pay, night_diff_pay=night_diff_pay,
                 holiday_pay=holiday_pay, holiday_regular=holiday_regular, holiday_special=holiday_special,
                 bonus=bonus, gross=gross,
                 absent_ded=absent_ded, late_ded=late_ded, sss=sss, philhealth=philhealth,
-                pagibig=pagibig, tax=tax, taxable=r2(taxable), total_ded=total_ded,
+                pagibig=pagibig, sss_loan=sss_loan, pagibig_loan=pagibig_loan,
+                tax=tax, taxable=r2(taxable), total_ded=total_ded,
                 net=r2(gross - total_ded), daily_rate=daily, hourly_rate=hourly)
 
 
